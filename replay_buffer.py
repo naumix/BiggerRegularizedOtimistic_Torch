@@ -1,7 +1,8 @@
 import numpy as np
+import torch
 
 class ReplayBuffer:
-    def __init__(self, state_size: int, action_size: int, capacity: int):
+    def __init__(self, state_size: int, action_size: int, capacity: int, device: str = 'cpu'):
         self.states = np.empty((capacity, state_size), dtype=np.float32)
         self.actions = np.empty((capacity, action_size), dtype=np.float32)
         self.rewards = np.empty((capacity,), dtype=np.float32)
@@ -10,6 +11,7 @@ class ReplayBuffer:
         self.size = 0
         self.insert_index = 0
         self.capacity = capacity
+        self.device = device
         
     def insert(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray, mask: float):
         self.states[self.insert_index] = state
@@ -31,9 +33,12 @@ class ReplayBuffer:
 
     def sample_multibatch(self, batch_size: int, num_batches: int):
         indx = np.random.randint(self.size, size=(num_batches, batch_size))
-        states = self.states[indx]
-        actions = self.actions[indx]
-        rewards = self.rewards[indx]
-        masks = self.masks[indx]
-        next_states = self.next_states[indx]
+        states = self.to_tensor(self.states[indx])
+        actions = self.to_tensor(self.actions[indx])
+        rewards = self.to_tensor(self.rewards[indx])
+        masks = self.to_tensor(self.masks[indx])
+        next_states = self.to_tensor(self.next_states[indx])
         return states, actions, rewards, next_states, masks
+    
+    def to_tensor(self, array: np.ndarray):
+        return torch.from_numpy(array).to(self.device)

@@ -129,13 +129,15 @@ class BRO(nn.Module):
 
     def update_critic(self, states, actions, rewards, next_states, masks):
         with torch.no_grad():
-            next_actions, next_log_probs = self.get_action_and_logprob(states)
+            next_actions, next_log_probs = self.get_action(states)
+            #next_actions, next_log_probs = agent.get_action(states)
             next_q1, next_q2 = self.target_critic(next_states, next_actions)
+            #next_q1, next_q2 = agent.target_critic(next_states, next_actions)
         q_mean = (next_q1 + next_q2) / 2
         q_uncertainty = torch.abs(next_q1 - next_q2) / 2
         next_q = q_mean - self.pessimism * q_uncertainty
         target_q = rewards[:, None, None] + self.discount * masks[:, None, None]  * next_q[:, None, :]
-        target_q -= self.discount * self.temp() * masks[:, None, None] * next_log_probs[:, :, None]
+        target_q -= self.discount * self.temp * masks[:, None, None] * next_log_probs[:, :, None]
         q1, q2 = self.critic(states, actions)
         td_errors1 = target_q - q1[:, :, None]
         td_errors2 = target_q - q2[:, :, None] 
@@ -145,10 +147,10 @@ class BRO(nn.Module):
         self.optimizer_critic.step()
         return {'critic_loss': critic_loss.detach().item(),
                 'q_mean': q_mean.mean().detach().item(),
-                'q_uncertainty': q_uncertainty.detach().item()}
+                'q_uncertainty': q_uncertainty.mean().detach().item()}
     
     def update_actor(self, states):
-        actions, log_probs = self.get_action_and_logprob(states)
+        actions, log_probs = self.get_action(states)
         q1, q2 = self.critic(states, actions)
         q = (q1 + q2) / 2 - self.pessimism * torch.abs(q1 - q2) / 2
         q = q.mean(-1, keepdim=True)
@@ -176,10 +178,9 @@ class BRO(nn.Module):
         actor_info = self.update_actor(states)
         return {**actor_info, **critic_info}
     
-    def update(self, step, buffer, batch_size, replay_ratio):
-        states, actions, rewards, next_states, masks = buffer.sample(batch_size)
+    def update(self, step, states, actions, rewards, next_states, masks, replay_ratio):
         for i in range(replay_ratio):
-            info = self.single_update(states, actions, rewards, next_states, masks)
+            info = self.single_update(states[i], actions[i], rewards[i], next_states[i], masks[i])
         return info
     
 '''  
