@@ -130,9 +130,7 @@ class BRO(nn.Module):
     def update_critic(self, states, actions, rewards, next_states, masks):
         with torch.no_grad():
             next_actions, next_log_probs = self.get_action(states)
-            #next_actions, next_log_probs = agent.get_action(states)
             next_q1, next_q2 = self.target_critic(next_states, next_actions)
-            #next_q1, next_q2 = agent.target_critic(next_states, next_actions)
         q_mean = (next_q1 + next_q2) / 2
         q_uncertainty = torch.abs(next_q1 - next_q2) / 2
         next_q = q_mean - self.pessimism * q_uncertainty
@@ -179,6 +177,8 @@ class BRO(nn.Module):
         return {**actor_info, **critic_info}
     
     def update(self, step, states, actions, rewards, next_states, masks, replay_ratio):
+        if step in self.reset_list:
+            self.reset()
         for i in range(replay_ratio):
             info = self.single_update(states[i], actions[i], rewards[i], next_states[i], masks[i])
         return info

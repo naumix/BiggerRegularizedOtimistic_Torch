@@ -15,7 +15,6 @@ def get_seed():
     return np.random.randint(0,1e8)
 
 FLAGS = flags()
-
 env = _make_env_dmc('cheetah-run', 1)
 buffer = ReplayBuffer(env.observation_space.shape[-1], env.action_space.shape[-1], FLAGS.max_steps)
 agent = BRO(env.observation_space.shape[-1], env.action_space.shape[-1])
@@ -33,7 +32,7 @@ for i in range(FLAGS.max_steps):
     buffer.insert(state, action, reward, next_state, mask)
     state = next_state
     if termination or truncation:
-        state, _ = env.reset()
+        state, _ = env.reset(seed=get_seed())
     if i > FLAGS.init_steps:
         states, actions, rewards, next_states, masks = buffer.sample_multibatch(FLAGS.batch_size, FLAGS.replay_ratio)
         info = agent.update(i, states, actions, rewards, next_states, masks, FLAGS.replay_ratio) 
