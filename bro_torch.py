@@ -91,7 +91,7 @@ class BRO(nn.Module):
         self.pessimism = pessimism
         self.state_size, self.action_size = state_size, action_size
         self.n_quantiles = n_quantiles
-        quantile_taus = torch.arange(0, n_quantiles+1) / n_quantiles
+        quantile_taus = (torch.arange(0, n_quantiles+1) / n_quantiles).to(device)
         self.quantile_taus = ((quantile_taus[1:] + quantile_taus[:-1]) / 2.0)[None, ...]
         self.kappa = 1.0
         self.tau = 0.995

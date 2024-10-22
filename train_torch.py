@@ -62,7 +62,7 @@ def evaluate(eval_env, agent, eval_episodes: int, temperature: float = 0.0):
         observation, _ = eval_env.reset(seed=get_seed())
         while episode_done is False:
             with torch.no_grad():
-                action = agent.get_action(torch.from_numpy(observation).unsqueeze(0), get_log_prob=False, temperature=0.0)
+                action = agent.get_action(torch.from_numpy(observation).unsqueeze(0).to(agent.device), get_log_prob=False, temperature=0.0)
             action = action.detach().numpy()[0]
             next_observation, reward, termination, truncation, _ = eval_env.step(action)
             returns[episode] += reward
@@ -96,7 +96,7 @@ def main(_):
     eval_env = make_env_dmc(FLAGS.env_name)
     
     buffer = ReplayBuffer(FLAGS.max_steps, env.observation_space, env.action_space, device, handle_timeout_termination=False)
-    agent = BRO(env.observation_space.shape[-1], env.action_space.shape[-1])
+    agent = BRO(env.observation_space.shape[-1], env.action_space.shape[-1], device=device)
     
     observation, _ = env.reset(seed=get_seed())
     for i in range(1, FLAGS.max_steps + 1):
@@ -104,7 +104,7 @@ def main(_):
             action = env.action_space.sample()
         else:
             with torch.no_grad():
-                action = agent.get_action(torch.from_numpy(observation).unsqueeze(0), get_log_prob=False, temperature=0.0)
+                action = agent.get_action(torch.from_numpy(observation).unsqueeze(0).to(device), get_log_prob=False, temperature=1.0)
             action = action.detach().numpy()[0]
         next_observation, reward, termination, truncation, _ = env.step(action)
         done = get_done(termination, truncation)
