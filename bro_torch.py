@@ -78,14 +78,14 @@ class BroNetActor(nn.Module):
     
 class BRO(nn.Module):
     def __init__(self, 
-                 state_size, 
-                 action_size, 
+                 state_size: int, 
+                 action_size: int, 
+                 device: str,
                  pessimism: float = 1.0, 
                  learning_rate: float = 3e-4, 
                  n_quantiles: int = 100, 
                  discount: float = 0.99,
-                 replay_ratio: int = 2,
-                 device='cpu'):
+                 replay_ratio: int = 2):
         super().__init__()
         self.discount = discount
         self.pessimism = pessimism
@@ -186,20 +186,3 @@ class BRO(nn.Module):
             info = self.single_update(batch.observations, batch.actions, batch.rewards, batch.next_observations, batch.dones)
         return info
     
-'''  
-critic = BroNetCritics(10, 4, 100)
-actor = BroNetActor(10, 4)
-agent = BRO(10, 4, 1.0 , 100, 0.99)
-
-state = torch.ones(32, 10).float()
-action = torch.ones(32, 4).float()
-reward = torch.ones(32).float()
-next_state = torch.ones(32, 10).float()
-mask = torch.ones(32).float()
-loss_c = agent.update_critic(state, action, reward, next_state, mask)
-loss_a = agent.update_actor(state)
-
-q1, q2 = critic(state, action)
-means, std = actor(state)
-action, log_prob = agent.get_action_and_logprob(state)
-'''
