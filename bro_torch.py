@@ -83,7 +83,8 @@ class BRO(nn.Module):
                  pessimism: float = 1.0, 
                  learning_rate: float = 3e-4, 
                  n_quantiles: int = 100, 
-                 discount: float = 0.99, 
+                 discount: float = 0.99,
+                 replay_ratio: int = 2,
                  device='cpu'):
         super().__init__()
         self.discount = discount
@@ -92,16 +93,16 @@ class BRO(nn.Module):
         self.n_quantiles = n_quantiles
         quantile_taus = torch.arange(0, n_quantiles+1) / n_quantiles
         self.quantile_taus = ((quantile_taus[1:] + quantile_taus[:-1]) / 2.0)[None, ...]
-        self.action_scale = 1.0
-        self.action_bias = 0.0
         self.kappa = 1.0
         self.tau = 0.995
         self.device = device
         self.learning_rate = learning_rate
         self.target_entropy = float(-action_size / 2)
         self.reset()
-        self.reset_list = []
-        
+        self.reset_list = [15001, 50001, 250001, 500001, 750001, 1000001, 1500001, 2000001]
+        if replay_ratio == 2:
+            self.reset_list = self.reset_list[:1]    
+            
     def reset(self):
         self.critic = BroNetCritics(self.state_size, self.action_size, self.n_quantiles).to(self.device)
         self.target_critic = BroNetCritics(self.state_size, self.action_size, self.n_quantiles).to(self.device)
@@ -120,12 +121,11 @@ class BRO(nn.Module):
         mu, std = self.actor(state, temperature)
         normal = torch.distributions.Normal(mu, std)
         x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
-        y_t = torch.tanh(x_t)
-        action = y_t * self.action_scale + self.action_bias
+        action = torch.tanh(x_t)
         if get_log_prob:
             log_prob = normal.log_prob(x_t)
             # Enforcing Action Bound
-            log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + 1e-6)
+            log_prob -= torch.log((1 - action.pow(2)) + 1e-6)
             log_prob = log_prob.sum(1, keepdim=True)
             return action, log_prob
         return action

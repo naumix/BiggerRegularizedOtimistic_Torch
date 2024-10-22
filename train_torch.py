@@ -9,20 +9,20 @@ import random
 import wandb
 
 from absl import app, flags
-flags.DEFINE_integer('seed', 0, 'Random seed.')
+#flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 5, 'Number of episodes used for evaluation.')
 flags.DEFINE_integer('eval_interval', 25000, 'Eval interval.')
 flags.DEFINE_integer('batch_size', 128, 'Mini batch size.')
 flags.DEFINE_integer('max_steps', int(1000000), 'Number of training steps.')
 flags.DEFINE_integer('replay_buffer_size', 1000000, '.')
 flags.DEFINE_integer('start_training', 2500, 'Number of training steps to start training.')
-flags.DEFINE_integer('replay_ratio', 10, 'Number of updates per step.')
+flags.DEFINE_integer('replay_ratio', 2, 'Number of updates per step.')
 flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
 FLAGS = flags.FLAGS
 
 '''
 class flags:
-    seed = 0
+    #seed = 0
     max_steps = 1000
     batch_size = 128
     start_training = 1001
@@ -74,16 +74,17 @@ def log_to_wandb(step, infos):
     wandb.log(dict_to_log, step=step)
       
 def main(_):
+    SEED = get_seed()
     wandb.init(
         config=FLAGS,
         entity='naumix',
         project='BRO_Torch',
         group=f'{FLAGS.env_name}',
-        name=f'BRO_seed:{FLAGS.seed}_RR:{FLAGS.updates_per_step}'
+        name=f'BRO_seed:{SEED}_RR:{FLAGS.replay_ratio}'
     )
-    random.seed(FLAGS.seed)
-    np.random.seed(FLAGS.seed)
-    torch.manual_seed(FLAGS.seed)
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
     torch.backends.cudnn.deterministic = FLAGS.torch_deterministic
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
