@@ -3,7 +3,8 @@ import os
 #os.environ['MUJOCO_GL'] = 'egl'
 
 from make_dmc import make_env_dmc
-from stable_baselines3.common.buffers import ReplayBuffer
+#from stable_baselines3.common.buffers import ReplayBuffer
+from replay_buffer import ReplayBuffer
 from bro_torch import BRO
 
 import torch
@@ -35,6 +36,7 @@ class flags_:
     eval_episodes = 5
     eval_interval = 5000
     env_name = 'cheetah-run'
+FLAGS = flags_()
 
 def get_seed():
     return np.random.randint(0,1e8)
@@ -93,7 +95,7 @@ def main(_):
     env = make_env_dmc(FLAGS.env_name)
     eval_env = make_env_dmc(FLAGS.env_name)
     
-    buffer = ReplayBuffer(buffer_size=FLAGS.max_steps, observation_space=env.observation_space, action_space=env.action_space, device=device, handle_timeout_termination=False)
+    buffer = ReplayBuffer(buffer_size=FLAGS.max_steps, observation_size=env.observation_space.shape[-1], action_size=env.action_space.shape[-1], device=device)
     agent = BRO(env.observation_space.shape[-1], env.action_space.shape[-1], device=device)
     
     observation, _ = env.reset(seed=get_seed())
@@ -111,11 +113,8 @@ def main(_):
         if termination or truncation:
             observation, _ = env.reset(seed=get_seed())
         if i > FLAGS.start_training:
-            if i in agent.reset_list:
-                agent.reset()
-            for i in range(FLAGS.replay_ratio):
-                batch = buffer.sample(FLAGS.batch_size)
-                info = agent.single_update(batch.observations, batch.actions, batch.rewards, batch.next_observations, batch.dones) 
+            observations, next_observations, actions, rewards, dones = buffer.sample_multibatch(FLAGS.batch_size, FLAGS.replay_ratio)
+            info = agent.update(i, observations, next_observations, actions, rewards, dones)
         if (i % FLAGS.eval_interval) == 0:
             eval_info = evaluate(eval_env, agent, FLAGS.eval_episodes)
             infos = {**info, **eval_info}

@@ -101,7 +101,8 @@ class BRO(nn.Module):
         self.reset()
         self.reset_list = [15001, 50001, 250001, 500001, 750001, 1000001, 1500001, 2000001]
         if replay_ratio == 2:
-            self.reset_list = self.reset_list[:1]    
+            self.reset_list = self.reset_list[:1] 
+        self.replay_ratio = replay_ratio
             
     def reset(self):
         self.critic = BroNetCritics(self.state_size, self.action_size, self.n_quantiles).to(self.device)
@@ -130,16 +131,16 @@ class BRO(nn.Module):
             return action, log_prob
         return action
 
-    def update_critic_distributional(self, states, actions, rewards, next_states, dones):
+    def update_critic_distributional(self, observations, next_observations, actions, rewards, dones):
         with torch.no_grad():
-            next_actions, next_log_probs = self.get_action(states)
-            next_q1, next_q2 = self.target_critic(next_states, next_actions)
+            next_actions, next_log_probs = self.get_action(observations)
+            next_q1, next_q2 = self.target_critic(next_observations, next_actions)
         q_mean = (next_q1 + next_q2) / 2
         q_uncertainty = torch.abs(next_q1 - next_q2) / 2
         next_q = q_mean - self.pessimism * q_uncertainty
         target_q = rewards[:, None, None] + self.discount * (1 - dones[:, None, None])  * next_q[:, None, :]
         target_q -= self.discount * self.temp * (1 - dones[:, None, None]) * next_log_probs[:, :, None]
-        q1, q2 = self.critic(states, actions)
+        q1, q2 = self.critic(observations, actions)
         td_errors1 = target_q - q1[:, :, None]
         td_errors2 = target_q - q2[:, :, None] 
         critic_loss = calculate_quantile_huber_loss(td_errors1, self.quantile_taus, kappa=self.kappa) + calculate_quantile_huber_loss(td_errors2, self.quantile_taus, kappa=self.kappa)
@@ -150,9 +151,9 @@ class BRO(nn.Module):
                 'q_mean': q_mean.mean().detach().item(),
                 'q_uncertainty': q_uncertainty.mean().detach().item()}
     
-    def update_actor(self, states):
-        actions, log_probs = self.get_action(states)
-        q1, q2 = self.critic(states, actions)
+    def update_actor(self, observations):
+        actions, log_probs = self.get_action(observations)
+        q1, q2 = self.critic(observations, actions)
         q = (q1 + q2) / 2 - self.pessimism * torch.abs(q1 - q2) / 2
         q = q.mean(-1, keepdim=True)
         actor_loss = (self.temp * log_probs - q).mean()
@@ -173,16 +174,16 @@ class BRO(nn.Module):
         for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
     
-    def single_update(self, states, actions, rewards, next_states, dones):
-        critic_info = self.update_critic_distributional(states, actions, rewards, next_states, dones)
+    def single_update(self, observations, next_observations, actions, rewards, dones):
+        critic_info = self.update_critic_distributional(observations, next_observations, actions, rewards, dones)
         self.update_target_critic()
-        actor_info = self.update_actor(states)
+        actor_info = self.update_actor(observations)
         return {**actor_info, **critic_info}
     
-    def update(self, step, batches):
+    def update(self, step, observations, next_observations, actions, rewards, dones):
         if step in self.reset_list:
             self.reset()
-        for batch in batches:
-            info = self.single_update(batch.observations, batch.actions, batch.rewards, batch.next_observations, batch.dones)
+        for i in range(self.replay_ratio):
+            info = self.single_update(observations[i], next_observations[i], actions[i], rewards[i], dones[i])
         return info
     
