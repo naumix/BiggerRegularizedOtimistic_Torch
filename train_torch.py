@@ -1,3 +1,7 @@
+import os
+
+#os.environ['MUJOCO_GL'] = 'egl'
+
 from make_dmc import make_env_dmc
 from stable_baselines3.common.buffers import ReplayBuffer
 from bro_torch import BRO
@@ -85,7 +89,7 @@ def main(_):
     random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
-    torch.backends.cudnn.deterministic = FLAGS.torch_deterministic
+    #torch.backends.cudnn.deterministic = FLAGS.torch_deterministic
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     env = make_env_dmc(FLAGS.env_name)
