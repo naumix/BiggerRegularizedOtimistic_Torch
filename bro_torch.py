@@ -39,7 +39,7 @@ class BroNetCritic(nn.Module):
         x = x + res
         res = self.block4(x)
         res = self.block5(res)
-        x = res + x
+        x = x + res
         x = self.final_layer(x)
         return x
     
@@ -73,7 +73,7 @@ class BroNetActor(nn.Module):
         means = self.means(x)
         log_stds = self.log_stds(x)
         log_stds = self.log_std_min + (self.log_std_max - self.log_std_min) * 0.5 * (1 + torch.tanh(log_stds))
-        stds = log_stds.exp() * temperature
+        stds = log_stds.exp() * (temperature + 1e-8)
         return means, stds
     
 class BRO(nn.Module):
@@ -99,7 +99,6 @@ class BRO(nn.Module):
         self.device = device
         self.learning_rate = learning_rate
         self.target_entropy = float(-action_size / 2)
-        print(self.target_entropy)
         self.reset()
         self.reset_list = []
         
@@ -131,7 +130,7 @@ class BRO(nn.Module):
             return action, log_prob
         return action
 
-    def update_critic(self, states, actions, rewards, next_states, dones):
+    def update_critic_distributional(self, states, actions, rewards, next_states, dones):
         with torch.no_grad():
             next_actions, next_log_probs = self.get_action(states)
             next_q1, next_q2 = self.target_critic(next_states, next_actions)
@@ -175,16 +174,16 @@ class BRO(nn.Module):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
     
     def single_update(self, states, actions, rewards, next_states, dones):
-        critic_info = self.update_critic(states, actions, rewards, next_states, dones)
+        critic_info = self.update_critic_distributional(states, actions, rewards, next_states, dones)
         self.update_target_critic()
         actor_info = self.update_actor(states)
         return {**actor_info, **critic_info}
     
-    def update(self, step, states, actions, rewards, next_states, dones, replay_ratio):
+    def update(self, step, batches):
         if step in self.reset_list:
             self.reset()
-        for i in range(replay_ratio):
-            info = self.single_update(states[i], actions[i], rewards[i], next_states[i], dones[i])
+        for batch in batches:
+            info = self.single_update(batch.observations, batch.actions, batch.rewards, batch.next_observations, batch.dones)
         return info
     
 '''  

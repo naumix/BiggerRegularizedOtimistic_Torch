@@ -10,7 +10,6 @@ from gymnasium.spaces import Box
 from gymnasium import spaces
 from gymnasium.wrappers import FlattenObservation, RescaleAction
 
-
 def _spec_to_box(spec, dtype=np.float32):
     def extract_min_max(s):
         assert s.dtype == np.float64 or s.dtype == np.float32
@@ -149,8 +148,10 @@ class DMCGym(Env):
         return self._env.physics.render(height=height, width=width, camera_id=camera_id)
     
     
-def _make_env_dmc(env_name: str, action_repeat: int = 1) -> Env:
+def make_env_dmc(env_name: str, action_repeat: int = 1) -> Env:
     env = DMCGym(env_name=env_name, action_repeat=action_repeat)
     env = RescaleAction(env, -1.0, 1.0)
     env = FlattenObservation(env)
     return env
+
+    
