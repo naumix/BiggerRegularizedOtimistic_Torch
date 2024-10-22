@@ -95,9 +95,13 @@ class BRO(nn.Module):
         self.action_scale = 1.0
         self.action_bias = 0.0
         self.kappa = 1.0
+        self.tau = 0.995
         self.device = device
         self.learning_rate = learning_rate
+        self.target_entropy = float(-action_size / 2)
+        print(self.target_entropy)
         self.reset()
+        self.reset_list = []
         
     def reset(self):
         self.critic = BroNetCritics(self.state_size, self.action_size, self.n_quantiles).to(self.device)
@@ -127,15 +131,15 @@ class BRO(nn.Module):
             return action, log_prob
         return action
 
-    def update_critic(self, states, actions, rewards, next_states, masks):
+    def update_critic(self, states, actions, rewards, next_states, dones):
         with torch.no_grad():
             next_actions, next_log_probs = self.get_action(states)
             next_q1, next_q2 = self.target_critic(next_states, next_actions)
         q_mean = (next_q1 + next_q2) / 2
         q_uncertainty = torch.abs(next_q1 - next_q2) / 2
         next_q = q_mean - self.pessimism * q_uncertainty
-        target_q = rewards[:, None, None] + self.discount * masks[:, None, None]  * next_q[:, None, :]
-        target_q -= self.discount * self.temp * masks[:, None, None] * next_log_probs[:, :, None]
+        target_q = rewards[:, None, None] + self.discount * (1 - dones[:, None, None])  * next_q[:, None, :]
+        target_q -= self.discount * self.temp * (1 - dones[:, None, None]) * next_log_probs[:, :, None]
         q1, q2 = self.critic(states, actions)
         td_errors1 = target_q - q1[:, :, None]
         td_errors2 = target_q - q2[:, :, None] 
@@ -152,7 +156,7 @@ class BRO(nn.Module):
         q1, q2 = self.critic(states, actions)
         q = (q1 + q2) / 2 - self.pessimism * torch.abs(q1 - q2) / 2
         q = q.mean(-1, keepdim=True)
-        actor_loss = (self.temp() * log_probs - q).mean()
+        actor_loss = (self.temp * log_probs - q).mean()
         self.optimizer_actor.zero_grad()
         actor_loss.backward()
         self.optimizer_actor.step()
@@ -170,17 +174,17 @@ class BRO(nn.Module):
         for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
     
-    def single_update(self, states, actions, rewards, next_states, masks):
-        critic_info = self.update_critic(states, actions, rewards, next_states, masks)
+    def single_update(self, states, actions, rewards, next_states, dones):
+        critic_info = self.update_critic(states, actions, rewards, next_states, dones)
         self.update_target_critic()
         actor_info = self.update_actor(states)
         return {**actor_info, **critic_info}
     
-    def update(self, step, states, actions, rewards, next_states, masks, replay_ratio):
+    def update(self, step, states, actions, rewards, next_states, dones, replay_ratio):
         if step in self.reset_list:
             self.reset()
         for i in range(replay_ratio):
-            info = self.single_update(states[i], actions[i], rewards[i], next_states[i], masks[i])
+            info = self.single_update(states[i], actions[i], rewards[i], next_states[i], dones[i])
         return info
     
 '''  

@@ -148,12 +148,6 @@ class DMCGym(Env):
         camera_id = camera_id or self.render_camera_id
         return self._env.physics.render(height=height, width=width, camera_id=camera_id)
     
-    def get_mask(self, termination, truncation):
-        if not termination or truncation:
-            mask = 1.0
-        else:
-            mask = 0.0
-        return mask
     
 def _make_env_dmc(env_name: str, action_repeat: int = 1) -> Env:
     env = DMCGym(env_name=env_name, action_repeat=action_repeat)
