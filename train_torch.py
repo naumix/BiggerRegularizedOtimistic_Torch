@@ -36,7 +36,7 @@ class flags_:
     eval_episodes = 5
     eval_interval = 5000
     env_name = 'cheetah-run'
-FLAGS = flags_()
+#FLAGS = flags_()
 
 def get_seed():
     return np.random.randint(0,1e8)
