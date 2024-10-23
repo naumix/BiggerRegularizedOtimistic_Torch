@@ -81,7 +81,7 @@ class BRO(nn.Module):
                  state_size: int, 
                  action_size: int, 
                  device: str,
-                 pessimism: float = 1.0, 
+                 pessimism: float = 0.0, 
                  learning_rate: float = 3e-4, 
                  n_quantiles: int = 100, 
                  discount: float = 0.99,
@@ -94,7 +94,7 @@ class BRO(nn.Module):
         quantile_taus = (torch.arange(0, n_quantiles+1) / n_quantiles).to(device)
         self.quantile_taus = ((quantile_taus[1:] + quantile_taus[:-1]) / 2.0)[None, ...]
         self.kappa = 1.0
-        self.tau = 0.995
+        self.tau = 0.005
         self.device = device
         self.learning_rate = learning_rate
         self.target_entropy = float(-action_size / 2)
