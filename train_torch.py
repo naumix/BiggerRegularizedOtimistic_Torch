@@ -21,7 +21,7 @@ flags.DEFINE_integer('batch_size', 128, 'Mini batch size.')
 flags.DEFINE_integer('max_steps', 1000000, 'Number of training steps.')
 flags.DEFINE_integer('replay_buffer_size', 1000000, '.')
 flags.DEFINE_integer('start_training', 2500, 'Number of training steps to start training.')
-flags.DEFINE_integer('replay_ratio', 2, 'Number of updates per step.')
+flags.DEFINE_integer('replay_ratio', 10, 'Number of updates per step.')
 flags.DEFINE_string('env_name', 'cheetah-run', 'Environment name.')
 FLAGS = flags.FLAGS
 
