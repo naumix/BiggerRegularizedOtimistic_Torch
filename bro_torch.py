@@ -35,7 +35,7 @@ class BroNetBlock(nn.Module):
         return x + out
 
 class BroNet(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size=512, bronet_layers=2, add_final_layer=True):
+    def __init__(self, input_size, output_size, hidden_size, bronet_layers, add_final_layer):
         super().__init__()
         self.projection = nn.Sequential(layer_init(nn.Linear(input_size, hidden_size)), nn.LayerNorm(hidden_size), nn.ReLU())
         self.embedding = nn.ModuleList()
@@ -55,7 +55,7 @@ class BroNet(nn.Module):
         return x
     
 class BroNetCritic(nn.Module):
-    def __init__(self, state_size, action_size, output_size, hidden_size=512, bronet_layers=2, add_final_layer=True):
+    def __init__(self, state_size, action_size, output_size, hidden_size, bronet_layers, add_final_layer):
         super().__init__()
         self.layers = BroNet(state_size+action_size, output_size, hidden_size, bronet_layers, add_final_layer)
         
@@ -63,35 +63,12 @@ class BroNetCritic(nn.Module):
         x = torch.concat((state, action), dim=-1)
         x = self.layers(x)
         return x
-    
-# old
-class BroNetCritic2(nn.Module):
-    def __init__(self, state_size, action_size, output_size):
-        super().__init__()
-        self.block1 = nn.Sequential(layer_init(nn.Linear(state_size+action_size, 512)), nn.LayerNorm(512), nn.ReLU())
-        self.block2 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512), nn.ReLU())
-        self.block3 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512))
-        self.block4 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512), nn.ReLU())
-        self.block5 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512))
-        self.final_layer = layer_init(nn.Linear(512, output_size))
         
-    def forward(self, state, action):
-        x = torch.concat((state, action), dim=-1)
-        x = self.block1(x)
-        res = self.block2(x)
-        res = self.block3(res)
-        x = x + res
-        res = self.block4(x)
-        res = self.block5(res)
-        x = x + res
-        x = self.final_layer(x)
-        return x
-    
 class BroNetCritics(nn.Module):
     def __init__(self, state_size, action_size, output_size):
         super().__init__()
-        self.critic1 = BroNetCritic(state_size, action_size, output_size)
-        self.critic2 = BroNetCritic(state_size, action_size, output_size)
+        self.critic1 = BroNetCritic(state_size, action_size, output_size, hidden_size=512, bronet_layers=2, add_final_layer=True)
+        self.critic2 = BroNetCritic(state_size, action_size, output_size, hidden_size=512, bronet_layers=2, add_final_layer=True)
         
     def forward(self, state, action):
         q1 = self.critic1(state, action)
@@ -138,9 +115,9 @@ class BRO(nn.Module):
         self.learning_rate = learning_rate
         self.target_entropy = float(-action_size / 2)
         self.reset()
-        self.reset_list = [15001, 50001, 250001, 500001, 750001, 1000001, 1500001, 2000001]
+        reset_list = [15001, 50001, 250001, 500001, 750001, 1000001, 1500001, 2000001]
         if replay_ratio == 2:
-            self.reset_list = self.reset_list[:1] 
+            self.reset_list = reset_list[:1] 
         self.replay_ratio = replay_ratio
             
     def reset(self):
@@ -207,7 +184,9 @@ class BRO(nn.Module):
         self.optimizer_log_temp.step()
         return {'actor_loss': actor_loss.detach().item(),
                 'entropy': entropy.detach().item(),
-                'temp_loss': temp_loss.detach().item()}
+                'temp_loss': temp_loss.detach().item(),
+                'temp': self.temp.detach().item(),
+                }        
     
     def update_target_critic(self):
         for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
