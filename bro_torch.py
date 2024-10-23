@@ -20,16 +20,60 @@ def calculate_quantile_huber_loss(td_errors, taus, kappa: float = 1.0):
     quantile_huber_loss = element_wise_quantile_huber_loss.sum(dim=1).mean()
     return quantile_huber_loss
 
-# fix init
+class BroNetBlock(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.block = nn.Sequential(layer_init(nn.Linear(hidden_size, hidden_size)), 
+                                    nn.LayerNorm(hidden_size), 
+                                    nn.ReLU(),
+                                    layer_init(nn.Linear(hidden_size, hidden_size)), 
+                                    nn.LayerNorm(hidden_size),
+                                    )
+        
+    def forward(self, x):
+        out = self.block(x)
+        return x + out
+
+class BroNet(nn.Module):
+    def __init__(self, input_size, output_size, hidden_size=512, bronet_layers=2, add_final_layer=True):
+        super().__init__()
+        self.projection = nn.Sequential(layer_init(nn.Linear(input_size, hidden_size)), nn.LayerNorm(hidden_size), nn.ReLU())
+        self.embedding = nn.ModuleList()
+        for i in range(bronet_layers):
+            self.embedding.append(BroNetBlock(hidden_size))
+        if add_final_layer:
+            self.final_layer = layer_init(nn.Linear(hidden_size, output_size))
+        self.bronet_layers = bronet_layers
+        self.add_final_layer = add_final_layer
+        
+    def forward(self, x):
+        x = self.projection(x)
+        for i in range(self.bronet_layers):
+            x = self.embedding[i](x)
+        if self.add_final_layer:
+            x = self.final_layer(x)
+        return x
+    
 class BroNetCritic(nn.Module):
-    def __init__(self, state_size, action_size, output_nodes):
+    def __init__(self, state_size, action_size, output_size, hidden_size=512, bronet_layers=2, add_final_layer=True):
+        super().__init__()
+        self.layers = BroNet(state_size+action_size, output_size, hidden_size, bronet_layers, add_final_layer)
+        
+    def forward(self, state, action):
+        x = torch.concat((state, action), dim=-1)
+        x = self.layers(x)
+        return x
+    
+# old
+class BroNetCritic2(nn.Module):
+    def __init__(self, state_size, action_size, output_size):
         super().__init__()
         self.block1 = nn.Sequential(layer_init(nn.Linear(state_size+action_size, 512)), nn.LayerNorm(512), nn.ReLU())
         self.block2 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512), nn.ReLU())
         self.block3 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512))
         self.block4 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512), nn.ReLU())
         self.block5 = nn.Sequential(layer_init(nn.Linear(512, 512)), nn.LayerNorm(512))
-        self.final_layer = layer_init(nn.Linear(512, output_nodes))
+        self.final_layer = layer_init(nn.Linear(512, output_size))
         
     def forward(self, state, action):
         x = torch.concat((state, action), dim=-1)
@@ -44,10 +88,10 @@ class BroNetCritic(nn.Module):
         return x
     
 class BroNetCritics(nn.Module):
-    def __init__(self, state_size, action_size, output_nodes):
+    def __init__(self, state_size, action_size, output_size):
         super().__init__()
-        self.critic1 = BroNetCritic(state_size, action_size, output_nodes)
-        self.critic2 = BroNetCritic(state_size, action_size, output_nodes)
+        self.critic1 = BroNetCritic(state_size, action_size, output_size)
+        self.critic2 = BroNetCritic(state_size, action_size, output_size)
         
     def forward(self, state, action):
         q1 = self.critic1(state, action)
@@ -59,17 +103,12 @@ class BroNetActor(nn.Module):
         super().__init__()
         self.log_std_min = -10
         self.log_std_max = 2
-        self.block1 = nn.Sequential(layer_init(nn.Linear(state_size, 256)), nn.LayerNorm(256), nn.ReLU())
-        self.block2 = nn.Sequential(layer_init(nn.Linear(256, 256)), nn.LayerNorm(256), nn.ReLU())
-        self.block3 = nn.Sequential(layer_init(nn.Linear(256, 256)), nn.LayerNorm(256))
+        self.embedding = BroNet(input_size=state_size, output_size=None, hidden_size=256, bronet_layers=1, add_final_layer=False)
         self.means = layer_init(nn.Linear(256, action_size))
         self.log_stds = layer_init(nn.Linear(256, action_size), std=0.01)
         
     def forward(self, state, temperature=1.0):
-        x = self.block1(state)
-        res = self.block2(x)
-        res = self.block3(x)
-        x = x + res
+        x = self.embedding(state)
         means = self.means(x)
         log_stds = self.log_stds(x)
         log_stds = self.log_std_min + (self.log_std_max - self.log_std_min) * 0.5 * (1 + torch.tanh(log_stds))
