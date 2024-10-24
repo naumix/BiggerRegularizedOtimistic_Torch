@@ -96,7 +96,7 @@ def main(_):
     eval_env = make_env_dmc(FLAGS.env_name)
     
     buffer = ReplayBuffer(buffer_size=FLAGS.max_steps, observation_size=env.observation_space.shape[-1], action_size=env.action_space.shape[-1], device=device)
-    agent = BRO(env.observation_space.shape[-1], env.action_space.shape[-1], device=device)
+    agent = BRO(env.observation_space.shape[-1], env.action_space.shape[-1], device=device, replay_ratio=FLAGS.replay_ratio, distributional=False)
     
     observation, _ = env.reset(seed=get_seed())
     for i in range(1, FLAGS.max_steps + 1):
