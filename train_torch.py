@@ -1,9 +1,4 @@
-import os
-
-#os.environ['MUJOCO_GL'] = 'egl'
-
 from make_dmc import make_env_dmc
-#from stable_baselines3.common.buffers import ReplayBuffer
 from replay_buffer import ReplayBuffer
 from bro_torch import BRO
 
@@ -14,6 +9,7 @@ import random
 import wandb
 
 from absl import app, flags
+
 #flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 5, 'Number of episodes used for evaluation.')
 flags.DEFINE_integer('eval_interval', 25000, 'Eval interval.')
@@ -89,7 +85,6 @@ def main(_):
     random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
-    #torch.backends.cudnn.deterministic = FLAGS.torch_deterministic
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     env = make_env_dmc(FLAGS.env_name)
